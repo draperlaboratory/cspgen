@@ -1,0 +1,7 @@
+include "test_058.csp"
+
+testMain = echo_c.CIntUnknown -> STOP
+  
+assert testMain [FD= runAsMain(main)
+assert runAsMain(main) [FD= testMain
+

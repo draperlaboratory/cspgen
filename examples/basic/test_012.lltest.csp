@@ -1,0 +1,18 @@
+include "test_012.csp"
+
+testMain :: Proc
+testMain = cIntWrite_c.TID.0.CIntLoc_y.CIntKnown.1 ->
+           cIntRead_c.TID.0.CIntLoc_y.CIntKnown.1 ->
+           cIntWrite_c.TID.0.CIntLoc_y.CIntKnown.1 -> BRANCH1
+
+
+
+BRANCH1 :: Proc
+BRANCH1 = (cIntWrite_c.TID.0.CIntLoc_y.CIntKnown.1 -> STOP) |~| BRANCH2
+
+BRANCH2 :: Proc
+BRANCH2 = (cIntWrite_c.TID.0.CIntLoc_y.CIntUnknown -> STOP) |~|
+          (cIntWrite_c.TID.0.CIntLoc_y.CIntKnown.0 -> STOP)
+           
+
+assert testMain [FD= runAsMain(main)

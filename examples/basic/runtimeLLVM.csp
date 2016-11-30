@@ -1,0 +1,437 @@
+include "globVarDecs.csp"
+
+boundCVal :: (Int) -> CInt
+boundCVal (x) =
+  if x < minimumCVal then CIntUnknown
+    else if x > maximumCVal then CIntUnknown
+       else CIntKnown.x
+
+cOne :: CInt
+cOne = CIntKnown.1
+
+cTrue :: CBool
+cTrue = CBoolTrue
+
+
+intToBool :: (CInt) -> CBool
+intToBool (CIntUnknown) = CBoolUnknown
+intToBool (CIntKnown.0) = CBoolFalse
+intToBool (CIntKnown._) = CBoolTrue
+
+boolToInt :: (CBool) -> CInt
+boolToInt (CBoolUnknown) = CIntUnknown
+boolToInt (CBoolTrue)    = CIntKnown.1
+boolToInt (CBoolFalse)   = CIntKnown.0
+
+intToFloat :: (CInt) -> CFloat
+intToFloat (_) = CFloatUnknown
+
+floatToInt :: (CFloat) -> CInt
+floatToInt (_) = CIntUnknown
+
+
+-----
+----- Arithmetic
+-----
+
+-- integral
+
+unknownOrBound :: ((Int) -> (Int) -> Int) -> (CInt,CInt) -> CInt
+unknownOrBound (_) (CIntUnknown,_) = CIntUnknown
+unknownOrBound (_) (_,CIntUnknown) = CIntUnknown
+unknownOrBound (f) (CIntKnown.x,CIntKnown.y) = boundCVal (f (x) (y))
+
+plus :: (CInt,CInt) -> CInt
+plus = unknownOrBound (\x @ \y @ x + y)
+
+minus :: (CInt,CInt) -> CInt
+minus = unknownOrBound (\x @ \y @ x - y)
+
+divide :: (CInt,CInt) -> CInt
+divide = unknownOrBound (\x @ \y @ x / y)
+
+multiply :: (CInt,CInt) -> CInt
+multiply = unknownOrBound (\x @ \y @ x * y)
+
+mod :: (CInt,CInt) -> CInt
+mod = unknownOrBound (\x @ \y @ x % y)
+
+negate :: (CInt) -> CInt
+negate (CIntUnknown)  = CIntUnknown
+negate (CIntKnown.x) = boundCVal (-x)
+
+-- bitwise
+
+bwOr :: (CInt,CInt) -> CInt
+bwOr (CIntUnknown,_) = CIntUnknown
+bwOr (_,CIntUnknown) = CIntUnknown
+bwOr (CIntKnown.0,CIntKnown.0) = CIntKnown.0
+bwOr (CIntKnown.1,CIntKnown.0) = CIntKnown.1
+bwOr (CIntKnown.0,CIntKnown.1) = CIntKnown.1
+bwOr (CIntKnown.1,CIntKnown.1) = CIntKnown.1
+bwOr (_,_) = CIntUnknown
+
+bwAnd :: (CInt,CInt) -> CInt
+bwAnd (CIntUnknown,_) = CIntUnknown
+bwAnd (_,CIntUnknown) = CIntUnknown
+bwAnd (CIntKnown.0,CIntKnown.0) = CIntKnown.0
+bwAnd (CIntKnown.1,CIntKnown.0) = CIntKnown.0
+bwAnd (CIntKnown.0,CIntKnown.1) = CIntKnown.0
+bwAnd (CIntKnown.1,CIntKnown.1) = CIntKnown.1
+bwAnd (_,_) = CIntUnknown
+
+bwXor :: (CInt,CInt) -> CInt
+bwXor (CIntUnknown,_) = CIntUnknown
+bwXor (_,CIntUnknown) = CIntUnknown
+bwXor (CIntKnown.0,CIntKnown.0) = CIntKnown.0
+bwXor (CIntKnown.1,CIntKnown.0) = CIntKnown.1
+bwXor (CIntKnown.0,CIntKnown.1) = CIntKnown.1
+bwXor (CIntKnown.1,CIntKnown.1) = CIntKnown.0
+bwXor (_,_) = CIntUnknown
+
+bwNot :: (CInt) -> CInt
+bwNot (_) = CIntUnknown
+
+leftShift :: (CInt,CInt) -> CInt
+leftShift (i,CIntKnown.0) = i
+leftShift (CIntKnown.0,_) = CIntKnown.0
+leftShift (CIntKnown.1,CIntKnown.1) = CIntKnown.2
+leftShift (_,_) = CIntUnknown
+
+rightShift :: (CInt,CInt) -> CInt
+rightShift (_,_) = CIntUnknown
+
+-- Truncate an integer to 1 bit.
+trunc1 :: (CInt) -> CBool
+trunc1 (CIntUnknown) = CBoolUnknown
+trunc1 (CIntKnown.n) = if (n%2) == 1 then CBoolTrue else CBoolFalse
+
+-- Truncate an integer to 8 bits.  Not ideal.
+trunc8 :: (CInt) -> CInt
+trunc8 (CIntUnknown) = CIntUnknown
+trunk8 (CIntKnown.i) = if 0 <= i and i <= 127 then CIntKnown.i else CIntUnknown
+
+-- Truncate an integer to 16 bits.  Not ideal.
+trunc16 :: (CInt) -> CInt
+trunc16 (CIntUnknown) = CIntUnknown
+trunc16 (CIntKnown.i) = if 0 <= i and i <= 65535 then CIntKnown.i else CIntUnknown
+
+
+-- floating point
+
+plusFloat :: (CFloat,CFloat) -> CFloat
+plusFloat (CFloatUnknown,CFloatUnknown) = CFloatUnknown
+
+multiplyFloat :: (CFloat,CFloat) -> CFloat
+multiplyFloat (CFloatUnknown,CFloatUnknown) = CFloatUnknown
+
+divideFloat :: (CFloat,CFloat) -> CFloat
+divideFloat (CFloatUnknown,CFloatUnknown) = CFloatUnknown
+
+minusFloat :: (CFloat,CFloat) -> CFloat
+minusFloat (CFloatUnknown,CFloatUnknown) = CFloatUnknown
+
+-- Boolean
+
+-- this is unary minus.  so id on 0 and underflow on 1
+negateBool :: (CBool) -> CBool
+negateBool (CBoolUnknown) = CBoolUnknown
+negateBool (CBoolFalse)   = CBoolFalse
+negateBool (CBoolTrue)    = CBoolUnknown
+
+plusBool :: (CBool,CBool) -> CBool
+plusBool (CBoolUnknown,_)       = CBoolUnknown
+plusBool (_,CBoolUnknown)       = CBoolUnknown
+plusBool (CBoolFalse,b)         = b
+plusBool (CBoolTrue,CBoolFalse) = CBoolTrue
+plusBool (CBoolTrue,CBoolTrue)  = CBoolUnknown
+
+minusBool :: (CBool,CBool) -> CBool
+minusBool (CBoolUnknown,_)       = CBoolUnknown
+minusBool (_,CBoolUnknown)       = CBoolUnknown
+minusBool (b,CBoolFalse)         = b
+minusBool (CBoolTrue,CBoolTrue)  = CBoolFalse
+minusBool (CBoolFalse,CBoolTrue) = CBoolUnknown
+
+
+-----
+----- Comparisons
+-----
+
+unknownOrBool :: ((Int) -> (Int) -> Bool) -> (CInt,CInt) -> CBool
+unknownOrBool (_) (CIntUnknown,_) = CBoolUnknown
+unknownOrBool (_) (_,CIntUnknown) = CBoolUnknown
+unknownOrBool (f) (CIntKnown.x,CIntKnown.y) =
+  if (f (x) (y)) then CBoolTrue else CBoolFalse
+
+-- additionally checks for negatives and returns unknown in that case.  For
+-- unsigned comparisons, until I feel like represnting them more accurately.
+unknownOrBoolU :: ((Int) -> (Int) -> Bool) -> (CInt,CInt) -> CBool
+unknownOrBoolU (_) (CIntUnknown,_) = CBoolUnknown
+unknownOrBoolU (_) (_,CIntUnknown) = CBoolUnknown
+unknownOrBoolU (f) (CIntKnown.x,CIntKnown.y) =
+  if ((x < 0) or (y < 0))
+    then CBoolUnknown
+    else if (f (x) (y)) then CBoolTrue else CBoolFalse
+
+
+-- integer
+
+neq :: (CInt,CInt) -> CBool
+neq = unknownOrBool (\x @ \y @ x != y)
+
+eq :: (CInt,CInt) -> CBool
+eq = unknownOrBool (\x @ \y @ x == y)
+
+
+slt :: (CInt,CInt) -> CBool
+slt = unknownOrBool (\x @ \y @ x < y)
+
+sle :: (CInt,CInt) -> CBool
+sle = unknownOrBool (\x @ \y @ x <= y)
+
+sgt :: (CInt,CInt) -> CBool
+sgt = unknownOrBool (\x @ \y @ x > y)
+
+sge :: (CInt,CInt) -> CBool
+sge = unknownOrBool (\x @ \y @ x >= y)
+
+
+ult :: (CInt,CInt) -> CBool
+ult = unknownOrBoolU (\x @ \y @ x < y)
+
+ule :: (CInt,CInt) -> CBool
+ule = unknownOrBoolU (\x @ \y @ x <= y)
+
+ugt :: (CInt,CInt) -> CBool
+ugt = unknownOrBoolU (\x @ \y @ x > y)
+
+uge :: (CInt,CInt) -> CBool
+uge = unknownOrBoolU (\x @ \y @ x >= y)
+
+
+
+-- float
+
+neqFloat :: (CFloat,CFloat) -> CInt
+neqFloat (CFloatUnknown,CFloatUnknown) = CIntUnknown
+
+eqFloat :: (CFloat,CFloat) -> CInt
+eqFloat (CFloatUnknown,CFloatUnknown) = CIntUnknown
+
+leFloat :: (CFloat,CFloat) -> CInt
+leFloat (CFloatUnknown,CFloatUnknown) = CIntUnknown
+
+ltFloat :: (CFloat,CFloat) -> CInt
+ltFloat (CFloatUnknown,CFloatUnknown) = CIntUnknown
+
+geFloat :: (CFloat,CFloat) -> CInt
+geFloat (CFloatUnknown,CFloatUnknown) = CIntUnknown
+
+gtFloat :: (CFloat,CFloat) -> CInt
+gtFloat (CFloatUnknown,CFloatUnknown) = CIntUnknown
+
+
+-----
+----- Logical operations
+-----
+
+
+lnotBool :: (CBool) -> CBool
+lnotBool (CBoolUnknown) = CBoolUnknown
+lnotBool (CBoolTrue)    = CBoolFalse
+lnotBool (CBoolFalse)   = CBoolTrue
+
+
+-----
+
+selectLLVM ::
+    (Stack,StackAddr,TIDTyp,
+     (Stack,StackAddr,TIDTyp,a) -> Proc,
+     CBool, a, a)
+  -> Proc
+selectLLVM (st,sp,tid,k,CBoolFalse,_,n)   = k (st,sp,tid,n)
+selectLLVM (st,sp,tid,k,CBoolTrue,y,_)    = k (st,sp,tid,y)
+selectLLVM (st,sp,tid,k,CBoolUnknown,y,n) = (k (st,sp,tid,y)) |~| (k (st,sp,tid,n))
+
+-------
+-- XXX I could do better here
+
+eqPointer :: (a,a) -> CInt
+eqPointer (_,_) = CIntUnknown
+
+neqPointer :: (a,a) -> CInt
+neqPointer (_,_) = CIntUnknown
+
+
+-------
+------- Increment and decrement
+-------
+
+--ints 
+postIncrement (rdr,wtr,k) (st,pid,l) =
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, plus(cOne,v),
+       \st'',pid'',_ @ k(st'', pid'', v)))
+ 
+preIncrement (rdr,wtr,k) (st,pid,l) =
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, plus(cOne,v), k))
+
+postDecrement (rdr,wtr,k) (st,pid,l) = 
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, minus(v,cOne),
+       \st'',pid'',_ @ k(st'',pid'',v)))
+
+preDecrement (rdr,wtr,k) (st,pid,l) = 
+  rdr (st, pid, l, 
+    \st',pid',v @ wtr(st', pid', l, minus(v,cOne),k))
+
+--bools
+postIncrementBool (rdr,wtr,k) (st,pid,l) =
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, plusBool(cTrue,v),
+       \st'',pid'',_ @ k(st'',pid'',v)))
+ 
+preIncrementBool (rdr,wtr,k) (st,pid,l) =
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, plusBool(cTrue,v),k))
+
+postDecrementBool (rdr,wtr,k) (st,pid,l) = 
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, minusBool(v,cTrue),
+       \st'',pid'',_ @ k(st'',pid'',v)))
+
+preDecrementBool (rdr,wtr,k) (st,pid,l) = 
+  rdr (st, pid, l,
+    \st',pid',v @ wtr(st', pid', l, minusBool(v,cTrue),k))
+
+
+---- A simple way to produce CSP events
+
+channel echo_c : CInt
+channel echo_log_c : CInt
+
+--echo :: (CInt,Stack,StackAddr,TIDTyp,
+--         (Stack,StackAddr,TIDTyp,Unit) -> Proc) -> Proc
+echo (v,st,sp,tid,k) = echo_c!v -> popStackFrame(st,sp,tid,k)
+echo_log (v,st,sp,tid,k) = echo_log_c!v -> popStackFrame(st,sp,tid,k)
+
+--    ---------------------
+--    -- Processes
+--    ---------------------
+--    
+--    channel new_pid_c : TIDTyp
+--    channel out_of_pids_ERROR
+--    
+--    -- This process allocates new process IDs.
+--    pid_controller :: (<PIDTyp>) -> Proc
+--    pid_controller (<>) = new_pid_c?_ -> out_of_pids_ERROR -> STOP
+--    pid_controller (<p1>^ps) = new_pid_c!p1 -> pid_controller(ps)
+--    
+--    ---- A simple way to spawn processes
+--    spawn :: 
+--      ((LocalState, TIDTyp, 
+--        ((LocalState,TIDTyp, Unit) -> Proc)) -> Proc,
+--       LocalState,
+--       TIDTyp,
+--       (LocalState, TIDTyp, Unit) -> Proc)
+--      -> Proc
+--    spawn (f, st, pid, k) = 
+--      new_pid_c?pid' -> f (emptyLocalState,pid',\_,_,_ @ SKIP) ||| k (st,pid,UnitVal)
+--    
+--    ---------------------
+--    -- Mutexes
+--    ---------------------
+--    
+--    -- mutex channels
+--    channel mutex_init_c : MutexID
+--    
+--    channel mutex_lock_c    : MutexID.PIDTyp
+--    channel mutex_unlock_c  : MutexID.PIDTyp
+--    channel mutex_destroy_c : MutexID
+--    
+--    channel out_of_mutexes_ERROR
+--    channel lock_uninit_mutex_ERROR
+--    channel unlock_uninit_mutex_ERROR
+--    channel destroy_uninit_mutex_ERROR
+--    
+--    -- These two definitions comprise a mutex itself.  Note that we permit the
+--    -- destruction of a locked mutex, though then it can never be unlocked.  The
+--    -- pthreads spec says destroying a locked mutex results in undefined behavior,
+--    -- so our model is sound but it might be more helpful to explicitly model it as
+--    -- an error.
+--    mutex :: (MutexID) -> Proc
+--    mutex (m) = (mutex_init_c!m -> mutex_running(m)) /\ (mutex_destroy_c!m -> STOP)
+--
+--    mutexes :: (<MutexID>) -> Proc
+--    mutexes (<>)      = STOP
+--    mutexes (<m1>^ms) = mutex(m1) ||| mutexes(ms)
+--    --  let
+--    --    mutex_1 = mutex(m1)
+--    --
+--    --    mutex_n(m) = mutex_1 [[mutex_lock_c.m1 <- mutex_lock_c.m,
+--    --                          mutex_unlock_c.m1 <- mutex_lock_c.m,
+--    --                          mutex_destroy_c.m1 <- mutex_destroy_c.m]]
+--    --
+--    --    mutexes_by_renaming (<>) = STOP
+--    --    mutexes_by_renaming (<x>) = mutex_n(x)
+--    --    mutexes_by_renaming (<x>^xs) =
+--    --      mutex_n(x) ||| mutexes_by_renaming(xs)
+--    --  within
+--    --    mutex_1 ||| mutexes_by_renaming(ms)
+--    
+--    mutex_running :: (MutexID) -> Proc
+--    mutex_running(m) = mutex_lock_c.m?pid -> mutex_unlock_c!m!pid -> mutex_running(m)
+--    
+--    mutex_controller :: (<MutexID>) -> Proc
+--    mutex_controller (<>) = mutex_init_c?_ -> out_of_mutexes_ERROR -> STOP
+--    mutex_controller (<m1>^ms) =
+--         mutex_init_c!m1
+--      -> mutex_controller(ms)
+--    
+--    allMIDs :: <MutexID>
+--    allMIDs = <M_ID.x | x <- <0..maximumMID>>
+--    
+--    mutex_system :: Proc
+--    mutex_system = mutex_controller(allMIDs) [| {| mutex_init_c |} |] mutexes(allMIDs)
+--    
+--    --mutex_controller :: (<MutexID>) -> Proc
+--    --mutex_controller (<>) = mutex_init_request_c?_ -> out_of_mutexes_ERROR -> STOP
+--    --mutex_controller (<m1>^ms) =
+--    --     mutex_init_request_c?pid
+--    --  -> (    (mutex_init_fulfill_c!m1!pid -> mutex_controller(ms))
+--    -- -      ||| mutex(m1))
+--    
+--    ----------------------------
+--    --- SYSTEM
+--    ----------------------------
+--    
+--    -- The "system" is what we run programs agiast (i.e., in parallel with).  This
+--    -- is the memory model, but also the system processes which do things like
+--    -- assign process IDs and allocate mutexes (OK, those are the only two for now).
+--    
+--    allPIDs :: <PIDTyp>
+--    allPIDs = <PID.x | x <- <1..maximumPID>>
+--    
+--    system_channels :: {Event}
+--    system_channels = 
+--       {| mutex_init_c,
+--          mutex_lock_c,
+--          mutex_unlock_c,
+--          mutex_destroy_c,
+--          new_pid_c
+--       |} 
+--    
+--    runInSystem :: (Proc) -> Proc
+--    runInSystem (p) = 
+--      runInMemory(
+--        (mutex_system ||| pid_controller(allPIDs))
+--          [| system_channels |]
+--        p)
+--    
+--    hideSystem :: (Proc) -> Proc
+--    hideSystem (p) = p \ system_channels
+--    
+--    hideMemSys :: (Proc) -> Proc
+--    hideMemSys (p) = hideMemory (hideSystem(p))

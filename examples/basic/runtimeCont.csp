@@ -1,0 +1,104 @@
+include "globVarDecs.csp"
+
+-- datatype CValTyp = CKnown.{0..4} | CUnknown
+
+-- channel ivread, ivwrite : CValLoc.CValTyp   -- read / write interface to heap
+
+minCVal, maxCVal :: Int
+minCVal = 0
+maxCVal = 4
+
+boundCVal :: (Int) -> CValTyp
+boundCVal (x) =
+  if x < minCVal then CUnknown
+    else if x > maxCVal then CUnknown
+       else CKnown.x
+
+-----
+----- Arithmetic
+-----
+
+unknownOrBound :: ((Int) -> (Int) -> Int) -> (CValTyp,CValTyp) -> CValTyp
+unknownOrBound (_) (CUnknown,_) = CUnknown
+unknownOrBound (_) (_,CUnknown) = CUnknown
+unknownOrBound (f) (CKnown.x,CKnown.y) = boundCVal (f (x) (y))
+
+plus :: (CValTyp,CValTyp) -> CValTyp
+plus = unknownOrBound (\x @ \y @ x + y)
+
+minus :: (CValTyp,CValTyp) -> CValTyp
+minus = unknownOrBound (\x @ \y @ x - y)
+
+divide :: (CValTyp,CValTyp) -> CValTyp
+divide = unknownOrBound (\x @ \y @ x / y)
+
+multiply :: (CValTyp,CValTyp) -> CValTyp
+multiply = unknownOrBound (\x @ \y @ x * y)
+
+mod :: (CValTyp,CValTyp) -> CValTyp
+mod = unknownOrBound (\x @ \y @ x % y)
+
+negate :: (CValTyp) -> CValTyp
+negate (CUnknown)  = CUnknown
+negate (CKnown.x) = boundCVal (-x)
+
+-----
+----- Comparisons
+-----
+
+unknownOrBool :: ((Int) -> (Int) -> Bool) -> (CValTyp,CValTyp) -> CValTyp
+unknownOrBool (_) (CUnknown,_) = CUnknown
+unknownOrBool (_) (_,CUnknown) = CUnknown
+unknownOrBool (f) (CKnown.x,CKnown.y) = if (f (x) (y)) then CKnown.1 else CKnown.0
+
+neq :: (CValTyp,CValTyp) -> CValTyp
+neq = unknownOrBool (\x @ \y @ x != y)
+
+eq :: (CValTyp,CValTyp) -> CValTyp
+eq = unknownOrBool (\x @ \y @ x == y)
+
+lt :: (CValTyp,CValTyp) -> CValTyp
+lt = unknownOrBool (\x @ \y @ x < y)
+
+le :: (CValTyp,CValTyp) -> CValTyp
+le = unknownOrBool (\x @ \y @ x <= y)
+
+gt :: (CValTyp,CValTyp) -> CValTyp
+gt = unknownOrBool (\x @ \y @ x > y)
+
+ge :: (CValTyp,CValTyp) -> CValTyp
+ge = unknownOrBool (\x @ \y @ x >= y)
+
+
+-----
+----- Logical operations
+-----
+
+land :: (CValTyp,CValTyp) -> CValTyp
+land = unknownOrBool (\x @ \y @ (x != 0) and (y != 0))
+
+lor :: (CValTyp,CValTyp) -> CValTyp
+lor = unknownOrBool (\x @ \y @ (x != 0) or (y != 0))
+
+lnot :: (CValTyp) -> CValTyp
+lnot (CUnknown) = CUnknown
+lnot (CKnown.x) = if x == 0 then CKnown.1 else CKnown.0
+
+-----
+
+ifthenelseProc :: (CValTyp,Proc,Proc) -> Proc
+ifthenelseProc (CKnown.x,y,n)   = if x == 0 then n else y
+ifthenelseProc (CUnknown,y,n) = y |~| n
+  
+---- Basic datatypes
+
+datatype Unit = UnitVal
+
+
+---- A simple way to produce CSP events
+
+channel echo_c : CValTyp
+
+echo :: (CValTyp,(| LocalAddress => DataUnion |),
+         ((| LocalAddress => DataUnion |)) -> Proc) -> Proc
+echo (v,st,k) = echo_c!v -> k(st)

@@ -1,0 +1,119 @@
+include "runtime.csp"
+
+-- These are implementations of the pthreads mutex functions against our model.
+--
+-- We are being a little unfaithful to the pthreads model: when something goes
+-- wrong (e.g., code attempts to lock an uninitialized mutex), we are causing a
+-- CSP error rather than returning an error code.
+--
+-- This has the advantage that these kinds of errors are highly visible, but the
+-- disadvantages that (1) we aren't completely sound and (2) we'll incorrectly
+-- report errors for code that checks for and gracefully handles error conditions.
+-- 
+-- A better compromise might be to create some csp events indicating the errors
+-- and return error codes but also communicate those events.  This would retain
+-- the high visibility of the error conditions but also be sound.
+
+
+
+-- XXX Right now we ignore the parameters argument.  Ideally we'd check that
+-- it's null, and fail otherwise.  That's tricky because the type for this
+-- struct is actually generated at runtime.  We really need a better story about
+-- external dependencies.
+--
+--pthread_mutex_init :: 
+--    (MutexLoc,
+--     LocalState,
+--     PIDTyp,
+--     (LocalState, PIDTyp, CInt) -> Proc)
+-- -> Proc
+pthread_mutex_init (mutLoc,_,locals,pid,k) =
+     mutex_init_c?mid
+  -> mutexCSPWriter(locals,pid,mutLoc,MutCSP.mid,
+                    \locals', pid', _ @ k(locals',pid',CIntKnown.0))
+
+pthread_mutex_destroy :: 
+    (MutexCSPLoc,
+     LocalState,
+     PIDTyp,
+     (LocalState, PIDTyp, CInt) -> Proc)
+ -> Proc
+pthread_mutex_destroy (mutLoc,locals,pid,k) =
+  let 
+    destroy_mut (_,_,Mut_UNINITIALIZED) =
+      destroy_uninit_mutex_ERROR -> STOP
+    destroy_mut (locals',pid',Mut.mid) =
+      mutex_destroy_c!mid -> k(locals',pid',CIntKnown.0)
+  within
+    mutexCSPReader(locals,pid,mutLoc,destroy_mut)
+
+pthread_mutex_lock ::
+    (MutexCSPLoc,
+     LocalState,
+     PIDTyp,
+     (LocalState, PIDTyp, CInt) -> Proc)
+ -> Proc
+pthread_mutex_lock (mutLoc,locals,pid,k) =
+  let
+    lock_mut (_,_,Mut_UNINITIALIZED) =
+      lock_uninit_mutex_ERROR -> STOP
+    lock_mut (locals',pid',Mut.mid) =
+      mutex_lock_c!mid!pid' -> k(locals',pid',CIntKnown.0)
+  within
+    mutexCSPReader(locals,pid,mutLoc,lock_mut)
+
+pthread_mutex_unlock ::
+    (MutexCSPLoc,
+     LocalState,
+     PIDTyp,
+     (LocalState, PIDTyp, CInt) -> Proc)
+ -> Proc
+pthread_mutex_unlock (mutLoc,locals,pid,k) =
+  let
+    unlock_mut (_,_,Mut_UNINITIALIZED) =
+      unlock_uninit_mutex_ERROR -> STOP
+    unlock_mut (locals',pid',Mut.mid) =
+      mutex_unlock_c!mid!pid' -> k(locals',pid',CIntKnown.0)
+  within
+    mutexCSPReader(locals,pid,mutLoc,unlock_mut)
+
+pthread_self :: (LocalState,PIDTyp,
+                 (LocalState,PIDTyp,PIDTyp) -> Proc)
+             -> Proc
+pthread_self (s,p,k) = k (s,p,p)
+
+pthread_equal :: (PIDTyp,PIDTyp,LocalState,PIDTyp,
+                  (LocalState,PIDTyp,CInt) -> Proc)
+             -> Proc
+pthread_equal (PIDUnknown,_,s,p,k) = k (s,p,CIntUnknown)
+pthread_equal (_,PIDUnknown,s,p,k) = k (s,p,CIntUnknown)
+pthread_equal (PID.x,PID.y,s,p,k) =
+  k (s,p,if x == y then CIntKnown.1 else CIntKnown.0)
+
+-- XXX Right now we ignore the parameters argument.  Ideally we'd check that
+-- it's null, and fail otherwise.  That's tricky because the type for this
+-- struct is actually generated at runtime.  We really need a better story about
+-- external dependencies.
+--
+-- XXX Right now we imagine that each thread has a completely separate stack
+-- address space.  Threads can not read from or write to the stack variables of
+-- other threads, even if you pass the addresses around, because of the way we
+-- represent local state.  If we encounter code that stack-allocates variables
+-- and then passes their addresses around, it will result in an error in FDR and
+-- we'll need to revisit this assumption.
+--
+-- pthread_create :: (PIDTypLoc,
+--                    pthrad_attr_tLoc,
+--                    ((VoidStar,LocalState,PIDTyp,
+--                      ((LocalState,PIDType,VoidStar) -> Proc)) -> Proc),
+--                    VoidStar,
+--                    LocalState,
+--                    PIDTyp,
+--                    (LocalState,PIDTyp,CInt) -> Proc) -> Proc
+pthread_create (thread_id_loc, config, to_spawn, arg,
+                st, pid, k) =
+  new_pid_c?new_pid ->
+    pIDTypWriter(st,pid,thread_id_loc,new_pid,
+      \st',pid',_ @
+         (    (to_spawn(arg,emptyLocalState,new_pid,\_,_,_@ SKIP))
+          ||| (k (st',pid',CIntKnown.0))))

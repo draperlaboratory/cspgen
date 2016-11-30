@@ -1,0 +1,8 @@
+include "test_025.csp"
+
+testMain :: Proc
+testMain = cIntWrite_c.TID.0.CIntLoc_y.CIntKnown.3 ->
+           cIntWrite_c.TID.0.CIntLoc_y.CIntKnown.4 -> STOP
+           
+
+assert testMain [FD= runAsMain(main)

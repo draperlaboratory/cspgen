@@ -1,0 +1,12 @@
+include "test_053.csp"
+
+testMain = echo_c.CIntKnown.0
+        -> echo_c.CIntKnown.2
+        -> echo_c.CIntKnown.1
+        -> echo_c.CIntKnown.3
+        -> STOP
+
+assert testMain [FD= hideMemory(runAsMain(main))
+assert hideMemory(runAsMain(main)) [FD= testMain
+
+

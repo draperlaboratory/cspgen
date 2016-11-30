@@ -1,0 +1,11 @@
+include "test_056.csp"
+
+testMain = 
+     echo_c.CIntKnown.4
+  -> echo_c.CIntKnown.2
+  -> echo_c.CIntKnown.0
+  -> STOP
+  
+assert testMain [FD= runAsMain(main)
+assert runAsMain(main) [FD= testMain
+

@@ -1,0 +1,10 @@
+include "cpp_test_002.csp"
+
+testMain = 
+     echo_c.CIntKnown.1
+  -> echo_c.CIntKnown.2
+  -> STOP
+  
+assert testMain [FD= hideMemory(runAsMain(main))
+assert hideMemory(runAsMain(main)) [FD= testMain
+

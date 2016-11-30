@@ -1,0 +1,18 @@
+include "test_037.csp"
+
+channel foo
+
+testMain = (echo_c.CIntKnown.1 -> echo_c.CIntKnown.0 -> STOP)
+       |~| (echo_c.CIntKnown.0 -> echo_c.CIntKnown.1 -> STOP)
+
+testMainDiv =
+  let 
+    testMainDiv' = testMain |~| (foo -> testMainDiv')
+  within
+    testMainDiv' \ {foo}
+
+assert hideMemSys(runMain) [FD= testMain
+assert not testMain [FD= hideMemSys(runMain)
+
+assert hideMemSys(runMain) [FD= testMainDiv
+assert testMainDiv [FD= hideMemSys(runMain)

@@ -1,0 +1,19 @@
+include "runtime.csp"
+
+channel smsg_chan : ChannelNames.SMsg_istrTyp
+
+send :: (SMsg_istrLoc,CVal,ChannelNames,
+         LocalState,
+         PIDTyp,
+         (LocalState,PIDTyp,SMsg_istrTyp) -> Proc) -> Proc
+send (sloc,_,cname,st,pid,k) =
+   smsg_istrReader(st,pid,sloc,
+      \st',pid',smsg @ smsg_chan!cname!smsg -> k(st',pid',smsg))
+
+recv :: (SMsg_istrLoc,CVal,ChannelNames,
+         LocalState,
+         PIDTyp,
+         (LocalState, PIDTyp,SMsg_istrTyp) -> Proc) -> Proc
+recv (sloc,_,cname,st,pid,k) =
+     smsg_chan!cname?smsg
+  -> smsg_istrWriter(st,pid,sloc,smsg,k)

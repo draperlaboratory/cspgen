@@ -1,0 +1,11 @@
+include "test_047.csp"
+
+testMain = echo_c.CIntKnown.1
+        -> echo_c.CIntKnown.2
+        -> echo_c.CIntKnown.3
+        -> arrayIndex_ERROR
+        -> STOP
+
+assert testMain [FD= hideMemory(runMain)
+assert hideMemory(runMain) [FD= testMain
+

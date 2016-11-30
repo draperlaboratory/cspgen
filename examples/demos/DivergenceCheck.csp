@@ -1,0 +1,4 @@
+
+include "Divergence.csp"
+
+assert hideMemory(runMain) :[divergence free]

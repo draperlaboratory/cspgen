@@ -1,0 +1,367 @@
+Some design notes to keep me sane.
+
+Clang, LLVM, and optimization
+-----------------------------
+
+The idea for this version of the csp tool is that our input will be LLVM IR.
+This LLVM IR will presumably be produced from the source code we are interested
+in by clang, clang++, or some other compiler.  This offers a few advantages - in
+particular, LLVM has fewer ugly corners than C, and we'll be able to handle more
+source languages.  Also, ideally, we'll be able to use the optimization and
+analysis passes of the source -> llvm ir compiler or the llvm ir toolkit itself.
+
+These optimizations are a double-edged sword.  On the one hand, they can do very
+convenient things like eliminating dead code and unnecessary state that will
+allow us to create better-optimized models.  On the other hand, they are
+typically operated with somewhat different goals than our own.  Since they are
+going to produce machine code, they tend to make very free use of assumptions
+about memory layout and bit-level encodings that are hard for us to model
+accurately.
+
+For my initial testing, I'm compiling C source to LLVM IR with clang.  Once I
+have the LLVM IR, I manipulated it using the llvm-general Haskell bindings,
+which provide access to many of the LLVM toolchain passes.  Thus, there are two
+opportunities to use optimizations/analysis passes provided in the llvm tooling:
+
+1) when running clang to get the llvm ir
+2) by calling the llvm toolchain passes exposed by the haskell bindings on the
+   llvm ir itself.
+
+My impression is that the clang optimizations are higher-level stuff than the
+llvm toolchain passes, which are primarily run at code-generation time.  But, I
+could be very wrong on this.
+
+The clang optimization passes are poorly documented.  There are flags -O1 to -O4
+with high-level descriptions, and that is it.  I have been unable to find any
+information about specific optimization or analysis passes that are run with
+each setting, and there are no command-line flags for particular passes.  The
+lower-level LLVM toolchain passes have somewhat better documentation, though
+they seem to change fairly frequently with different version of LLVM.
+
+I've done some experimentation with possible combinations of optimization passes
+to see how they interact with what we can handle.  Some notes appear in the
+separate file OPTIMIZATIONS.
+
+
+Variables and State
+-------------------
+
+In LLVM, there are a few things we might consider variables or state:
+
+- SSA variables
+
+  The value of these never changes, and their scope is local to the body of a
+  function.  However, there scope is not local to the basic block in which they
+  are declared.  So: we can use CSP binders to represent them, since their
+  address is not taken, but we do need to somehow pass their values around to
+  the various basic blocks.
+
+  For a first pass, here's what we'll do:
+
+  Using liveness analysis, we'll compute the live-in set for each basic block
+  and make these arguments to the function representing the basic block.  This
+  requires a liveness analysis for the SSA variables, which is thankfully not
+  too hard.
+
+- Globals
+
+  These are declared much like C, and we'll handle them in the same way (via
+  processes which run in parallel with the main control thread and remember the
+  value).
+
+- Dynamic allocation
+
+  Modern LLVM appears to have only one built-in allocation instruction - alloca.
+  This allocates stack variables which are automatically freed when the current
+  function returns.  We'll model these roughly like we model local variables in
+  C - by passing around the stack in continuations (i.e., statements will take
+  the current stack as an argument and pass an updated one to their
+  continuation).
+
+  This makes it easy to model, for example, passing the address of a local
+  variable as a function argument.  If we modeled alloca-allocated variables
+  like we're going to model SSA variables, we'd need to do lots of extra work to
+  make sure continuations can be passed the right number of updated variables,
+  rather than just one collection of variables that may or may not get updated.
+
+What about the heap?  There don't seem to be any LLVM instructions for
+allocating on the heap.  Instead, you can make calls to malloc and free just
+like any other functions.  As a first pass, we won't support this at all.
+
+
+The stack and local (alloca'd) variables
+----------------------------------------
+
+In the C version, we use a map from names of local variables to values to
+represent the local state.  This has some advantages (we use a collection of
+maps, one per type, means we don't need a bunch of "wrong type" error cases when
+looking up a variable).  It also has some disadvantages - recursion doesn't work
+at all because local variables just overwrite the old ones.
+
+For the LLVM version, I'm going to represent the stack as a list of values.
+These values will be drawn from a datatype which is a union of all values ever
+stored in stack-allocated variables.  On function return, we'll "pop" everything
+in the current frame.
+
+Addresses will be distances from the _end_ of this list.  We'll keep track of
+the address of the front of the list, so that lookup won't have to run down the
+whole thing.  There will be some maximum (100?) and we'll see how that goes.
+
+This has advantages (accurately representing memory locality) and disadvantages
+(a potential growth in state space, and inefficient access to stack vars) wrt to
+the C version.  But this is a good chance to try out a different point in the
+design space.
+
+Statements
+----------------------------------------
+
+LLVM statements will be modelled as anonymous CSPm functions.  These functions
+will take as arguments:
+
+  (1) the values of any SSA variables used by the statement.
+  (2) the current stack
+  (3) the current thread id
+  (4) A continuation, which itself takes the following arguments:
+        (4.1) an updated stack
+        (4.2) a thread id
+        (4.3) the return value of the current statement, or unit if none
+
+Basic Blocks
+----------------------------------------
+
+Basic blocks will be modelled by top-level CSPm functions.  These functions will
+take as arguments:
+
+  (1) the values of any SSA variables which are:
+        (a) used by this basic block or any of its descendents, and
+        (b) not defined by this basic block
+  (2) the current stack
+  (3) the current thread id
+  (4) A continuation.  Note that the basic block actually includes a terminator
+      instruction telling us what to do after it.  So, unlike the model of
+      statements, this continuation isn't what to do next.  Instead, it's what
+      to do when the function this basic block is in returns.  This is needed
+      for the return instruction.  This continuation takes as arguments:
+          (4.1) an updated stack
+          (4.2) a thread id
+          (4.3) the return value of the current function, or unit if void
+
+
+Phi Nodes
+----------------------------------------
+
+The traditional approach for compiling phi nodes is to insert copy instructions
+at the entry to basic blocks.  In more detail: phi nodes are always the first
+instructions in a basic block.  They define a local (SSA) variable whose value
+depends on which block preceded this block.  Typically, you compile them by
+adding "copy" instructions to the end of each predecessor basic block, storing
+the appropriate value in some location.  Then, you change the current block to
+just refer to that location instead of the result of a phi node.
+
+We'll take a similar approach: a basic block which begins with n phi nodes will
+be represented as a function with n extra arguments.  The predecessor blocks
+will be responsible for filling these in with the appropriate values.
+
+
+Functions
+----------------------------------------
+
+LLVM functions will be modeled as functions in CSP.  The CSP versions will take
+arguments corresponding to the original function's arguments, and also several
+additional arguments.  In particular, the CSP version will take as arguments:
+
+  (1) the arguments of the original function
+  (2) the current stack
+  (3) the current thread id
+  (4) A continuation, which itself takes the following arguments:
+        (4.1) an updated stack
+        (4.2) a thread id
+        (4.3) the return value of the function, with void modeled as unit
+
+
+Terminator Instructions
+----------------------------------------
+
+Most terminator instructions will be interpreted by just calling the function
+that represents the block jumped to.  This function takes some extra arguments
+in the form of SSA variables needed by it and its successors.
+
+Return instructions are a bit trickier.  In the case of return, we'll use the
+function's continuation rather than going to a specific block.  Additionally,
+we'll need to pop the current stack frame.
+
+
+Aggregate/Composite Types
+------------------------------------------
+
+C struct and arrays are represented as "aggregate" types in LLVM.  For example,
+the C struct:
+
+struct foo {
+  int x;
+  float y;
+};
+
+Is represented by the type "{i64; float}" in LLVM.  Note the name "foo" is lost;
+LLVM aggregate types have only structural equality - while C structs are
+distinguished by name, aggregate types in LLVM are considered identical if they
+have the same contents.
+
+We are using LLVM 3.4.  In this version, aggregate types are not quite treated
+as first class values.  For example, they are not passed to or returned from
+functions.  Assignments to aggregate types are broken down into assignments to
+the components or a memcopy, but are not treated as a single assignment.
+
+We simplify our CSP model by similarly not providing first-class representations
+of aggregate types.  For example, a global variable of struct type is
+represented as several individual variables (for each first class component in
+the struct), and when allocating a struct on the stack we similarly just push a
+new stack var for each first class component.
+
+This choice is convenient in the short term, but more recent versions of LLVM
+allow more generous use of structs as first-class (for example, they can be
+passed to and returned from functions directly).  Thus, we will likely
+eventually need to consider a more general model.
+
+
+VTables / Dynamic Dispatch
+-------------------------------------------------------
+
+We support objects, as produced by LLVM when run on C++ code.  In all our
+experimentation we have used the flags -m32 (cross-compile for 32 bits) and
+-fno-rtti, so the assumptions below may be invalid in other settings.
+
+When you compile object-oriented C++ code with LLVM, an 'extra' field is added
+at the beginning of your objects.  This field is a pointer to the vtable
+associated with the object.  Vtables are arrays of function pointers, which are
+used for dynamic dispatch: each object carries with it the appropriate method
+for its dynamic type.
+
+Annoyingly, LLVM plays lots of games with the types of these vtables.  In my
+experiements so far, a couple types come up a lot:
+
+- When LLVM defines a VTable at the top level, it often uses the type [n x i8*].
+  For example, here's a top-level definition from a test program:
+
+    @_ZTV3Cat = linkonce_odr unnamed_addr constant [3 x i8*] 
+                     [i8* null, i8* null,
+                      i8* bitcast (void (%class.Cat*)* @_ZN3Cat5noiseEv to i8*)]
+
+  Observe in particular how it casts a function pointer to an i8* in the final
+  position of the array.
+
+- When LLVM defines an object containing a vtable, the type "i32 (...)**" is
+  often used.  (This is a pointer to a pointer to a varargs function which
+  returns an i32).  For example, a virtual class containing just one int was
+  compiled this way:
+
+    %class.Animal = type { i32 (...)**, i32 }
+
+- When LLVM uses a vtable, it pretends every function pointed to has the type of
+  the function it is actually extracting.  As in this snippet (with line numbers
+  for explanation below
+
+  (1)  %3 = bitcast %class.Animal* %2 to void (%class.Animal*)***
+  (2)  %4 = load void (%class.Animal*)*** %3
+  (3)  %5 = getelementptr inbounds void (%class.Animal*)** %4, i64 0
+  (4)  %6 = load void (%class.Animal*)** %5
+  (5)  call void %6(%class.Animal* %2)
+
+  To walk through this: 
+
+  1) We cast a pointer to an object (which is also a pointer to its vtable,
+     since the vtable appears first in the object) to a:
+
+             "void (%class.Animal*)***"
+             
+     The function we are going to extract returns void and takes no arguments.
+     The LLVM version of this function takes one argument - a pointer to the
+     struct containing the function, used for accessing any internal state of
+     the struct needed.  Roughly, the cast moves us from a Animal* to a VTable*,
+     pretending every function in the vtable has the same time.
+
+  2) We load the vtable, obtaining a "void (%class.Animal*)**".  Now we have the
+     address of the vtable.
+
+  3) We index into the vtable, extracting the address of the function we care
+     about (in this case, the first one).
+
+  4) We load from the function's address, making %6 a name for the function
+  
+  5) We apply the function.
+
+
+Putting all this together - we can't always trust the types given to vtables and
+function pointers.  And this is potentially problematic, since our
+interpretation is so type-oriented.
+
+So, here is what we do: Since a vtable is an array that can contain pointers to
+functions of many different types, we need one generic type for "function
+pointers".  In our model, this called FPtr, and it's just an enumeration of
+every funtion in the program.  For example, if the program had three functions
+(main, f and g), it would look something like:
+
+      FPtr = FP_main | FP_f | FP_g
+
+To deal with top-level vtable definitions that pretend to have be arrays of i8*,
+we use a simple heuristic to determine if a top-level definition is a vtable: A
+top-level definition is treated as a vtable if it is a constant [n x i8*] for
+some n and each element is either null or a function pointer wrapped in a
+bitcast.  Such definitions are given the type [n x FPtr] instead of [n x i8*].
+
+When a function is applied, it is either an actual global function name or a
+function pointer.  In the latter case, the translation of the function operand
+will attempt to "dereference" the function pointer.  For each function type used
+in the program, we define a CSPm function which takes in a function pointer and
+returns a function.  Roughly:
+
+   deref_Int_Arrow_Void : FPtr -> ((Int) -> Proc)
+
+except with all the plumbing needed for local state and errors and stuff.  If
+the supplied FPtr refers to a function of the right type, that function is
+returned.  Otherwise, we produce an error event and then deadlock.
+
+The last thing to consider is how to deal with a reference to a function in the
+program (e.g., @f).  There are two ways this can occur - when the function is
+being applied, as in:
+
+  call void @f(i32 %2)
+
+Or as a function pointer, as in:
+
+  i8* bitcast (void (i32))* @f to i8*
+
+We default to translating @f as its function pointer, observing that the former
+case can only occur exactly when a function is being applied, while all other
+occurances of @f are for the function pointer.  When translating a function
+application, we use a different operand interpretation.
+
+
+
+Known Flaws ------------------------------------------
+
+There are some aspects of LLVM that we are intentionally not modelling
+accurately.  Typically, this is because they would drastically reduce
+model-checking performance.  These may represent gaps in the "soundness" of our
+tool, so it's good to be aware of them.
+
+- Overflow
+
+  Many arithmetic instructions (for example, add) can create "poison" values on
+  overflow in certain circumstances.  These poison values pollute everything
+  that depends on them with undefined behavior.
+
+  Since we don't model the full range of integers, we are very conservative with
+  respect to overflow.  In particular, if we can't guarantee that an integer
+  remains within our range, we model it as "unknown".
+
+  Our model of unknown isn't completely faithful to the LLVM notion of poison
+  values.  For them, the behavior of any instruction which depends on a poison
+  value is completely undefined.  We instead make conservative guesses (for
+  example, branching on unknown is interpreted as the non-deterministic choice
+  between the two branches, not completely undefined behavior).
+
+  Modelling unknown as a poison value would drastically reduce the usefulness of
+  our model, because the limited range of integers means that unknown comes up a
+  lot.  Thus, we aren't quite sound in the case where actual overflow occurs.
+  Not sure what to do about that.

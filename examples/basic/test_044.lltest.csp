@@ -1,0 +1,10 @@
+include "test_044.csp"
+
+testMain = foo_a_write_c.TID.0.fooLoc_bar.CIntKnown.1 -> 
+           foo_b_write_c.TID.0.fooLoc_bar.CBoolFalse -> 
+           foo_b_read_c.TID.0.fooLoc_bar.CBoolFalse -> 
+           foo_a_read_c.TID.0.fooLoc_bar.CIntKnown.1 -> echo_c.CIntKnown.1 ->
+           foo_a_read_c.TID.0.fooLoc_bar.CIntKnown.1 -> 
+           foo_a_write_c.TID.0.fooLoc_bar.CIntKnown.0 -> STOP
+
+assert testMain [FD= runAsMain(main)

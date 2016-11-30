@@ -1,0 +1,14 @@
+include "test_022.csp"
+
+testMain :: Proc
+testMain = echo_c.CIntKnown.1
+        -> echo_c.CIntKnown.2
+        -> echo_c.CIntKnown.1
+        -> echo_c.CIntKnown.2
+        -> echo_c.CIntKnown.2
+        -> echo_c.CIntKnown.3
+        -> echo_c.CIntKnown.2
+        -> echo_c.CIntKnown.3
+        -> testMain
+
+assert testMain [FD= runAsMain(main)

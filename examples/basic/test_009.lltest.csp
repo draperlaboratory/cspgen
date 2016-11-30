@@ -1,0 +1,12 @@
+include "test_009.csp"
+
+testMain :: (Int) -> Proc
+testMain (k) =
+  cIntRead_c.TID.0.CIntLoc_mytriple.CIntKnown.k ->
+  cIntWrite_c.TID.0.CIntLoc_mytriple.CIntKnown.((k+1)%2) ->
+  cIntRead_c.TID.0.CIntLoc_mytriple_2.CIntKnown.k ->
+  cIntWrite_c.TID.0.CIntLoc_mytriple_2.CIntKnown.((k+1)%2) ->
+  testMain((k+1)%2)
+           
+
+assert testMain(0) [FD= runAsMain(main)

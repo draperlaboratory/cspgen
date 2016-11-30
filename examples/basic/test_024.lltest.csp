@@ -1,0 +1,16 @@
+include "test_024.csp"
+
+loop :: Proc
+loop = 
+    cFloatRead_c.TID.0.CFloatLoc_x?_
+ -> (   (   cFloatRead_c.TID.0.CFloatLoc_x?_
+         -> cFloatWrite_c.TID.0.CFloatLoc_x.CFloatUnknown
+         -> echo_c.CIntKnown.0 
+         -> loop)
+     |~| (echo_c.CIntKnown.1 -> STOP))
+
+testMain :: Proc
+testMain = cFloatWrite_c.TID.0.CFloatLoc_x.CFloatUnknown
+        -> loop
+
+assert testMain [FD= runAsMain(main)

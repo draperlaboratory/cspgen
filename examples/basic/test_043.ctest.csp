@@ -1,0 +1,9 @@
+include "test_043.csp"
+
+testMain = cIntRead_c.PID.0.CIntLoc_x.CIntKnown.0 -> 
+           cIntRead_c.PID.0.CIntLoc_y.CIntKnown.1 -> 
+           cIntRead_c.PID.0.CIntLoc_y.CIntKnown.1 -> echo_c.CIntKnown.1 -> 
+           cIntRead_c.PID.0.CIntLoc_y.CIntKnown.1 ->
+           cIntWrite_c.PID.0.CIntLoc_y.CIntKnown.0 -> STOP
+
+assert testMain [FD= runMain

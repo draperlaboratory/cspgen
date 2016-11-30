@@ -1,0 +1,12 @@
+include "test_042.csp"
+
+branch1 :: Proc
+branch1 = echo_c.CIntUnknown -> STOP
+
+branch2 :: Proc
+branch2 = echo_c.CIntKnown.1 -> STOP
+
+testMain :: Proc
+testMain = branch1 |~| branch2
+
+assert testMain [FD= runMain

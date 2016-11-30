@@ -1,0 +1,82 @@
+It's going to take a lot of experimentation to determine what combination of
+clang and llvm-backend optimizations should be run on input to our toolchain,
+and how to do it.  Optimal performance will almost certainly require writing
+custom passes, but we're definitely going to avoid that for as long as possible,
+as we spin up the tool.
+
+I've found the following tiny example C program to be useful for
+experimentation:
+
+>  #include <stdio.h>
+>  
+>  struct foo {
+>    int x;
+>    int y;
+>  } z;
+>  
+>  int main() {
+>    struct foo a = {1,2};
+>    z = a;
+>    printf("%d\n",z.y);
+>    return 0;
+>  }
+
+clang optimization passes
+-------------------------
+
+- clang appears to always start main by allocating a local variable for the
+  return value (via alloca).  In this case, that value is always 0.  This
+  allocation appears when optimization is turned off entirely, but it removed at
+  -O1 and up.
+
+- At -O0 and -O1, but not higher, there is a private global mirroring "a":
+
+  > @main.a = private unnamed_addr constant %struct.foo { i32 1, i32 2 }, align 4
+
+  At -O0, "a" is also allocated locally in main.  At -O2 and higher, a is
+  optimized away completely, since its value is fixed.
+
+- The initialization of "a" is interesting.  At -O0, we get this:
+
+  > %a = alloca %struct.foo, align 4
+  > %2 = bitcast %struct.foo* %a to i8*
+  > call void @llvm.memcpy.p0i8.p0i8.i64(i8* %2, i8* bitcast (%struct.foo* @main.a to i8*), i64 8, i32 4, i1 false)
+
+  These instructions do the following:
+
+  1) allocate a as a local (now %a is a pointer to a's location on the stack).
+
+  2) create another local, %2, which is a copy of %a but has a different type
+     (it has been cast from a struct foo* to an i8*).  This is needed because
+     the llvm.memcpy.STUFF function requires its arguments to be pointers of
+     this type (which is almost sensible, since the length is specified in
+     bytes).
+
+  3) the arguments to memcpy are: destination, source, length, alignment, volatility.
+
+     Here, we see that we are copying from location @main.a to location %2
+     (i.e., to a's location on the stack).  We are copying 8 bytes of data (two
+     i32s).  The data is 4-aligned, and the copy is "non-volatile (whatever that
+     means).
+
+  At -O1 and higher, there is no local variable %a, and thus it is not
+  initialized.  In those versions, in the place where the value of a is needed,
+  the i64 "8589934593" is used.  To understand this, recall that a's value is
+  {1,2}, and observe that 8589934593 is 0x0000000200000001.  Why does the first
+  field come second?  Some detail of memory layout I should think harder about.
+
+- The assignment "z = a;" is also interesting.  With no optimization, we get:
+
+  > %3 = bitcast %struct.foo* %a to i8*
+  > call void @llvm.memcpy.p0i8.p0i8.i64(i8* bitcast (%struct.foo* @z to i8*), i8* %3, i64 8, i32 4, i1 false)
+
+  Here we're again casting the address of a to an i8*.  This time it's our
+  source, though.  The destination is the global z, also cast (in-line) to a
+  i8*.  We copy 8 bytes of memory, as expected.
+
+  At -O1 and higher, there is no local variable a and the value mentioned above
+  is used in its place.  Additionally, "store" is used rather than "memcpy" -
+  this is a slight change in semantics, as store is atomic but memcpy is not.
+
+  > store i64 8589934593, i64* bitcast (%struct.foo* @z to i64*), align 4
+

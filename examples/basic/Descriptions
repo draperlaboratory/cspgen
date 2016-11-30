@@ -1,0 +1,84 @@
+High-level descriptions of some of the tests:
+
+test_001.c
+  Global variable update
+
+test_002.c
+  Global variable update, recursion
+
+test_003.c
+  Simple for loops and global variables
+
+test_004.c
+test_005.c
+  Simple for loops, global addresses
+
+test_006.c
+  Structs, simple for loops, global addresses
+
+test_007.c
+test_008.c
+  Structs, indirect struct assignment, global address manipulation
+
+test_009.c
+  Nested structs, global struct variable field updates
+
+test_010.c
+  Repeated updates to a local variable, global address manipulation
+
+test_011.c
+  If statements with unknown scrutinees.
+
+test_012.c
+  Nested if statements.
+
+test_013.c
+  Loops modifying locals.
+
+test_014.c
+  Local address manipulation, echo
+
+test_015.c
+  Local address manipulation, loops, echo
+
+test_016.c
+test_017.c
+test_018.c
+test_019.c
+test_020.c
+test_021.c
+test_022.c
+  Nested loops, loop init/update/bound, breaks, if in loops, local addresses, echo
+
+test_023.c
+  Floats, for
+
+test_024.c
+  Floats, for
+
+test_025.c
+  Repeated local var updates, ++/--, global address manipulation
+
+test_026.c
+  ++ and -- on ints, echo
+
+test_027.c
+  bitwise operators (|, &, ^, ~), echo
+
+test_028.c
+  _Bool, typedef, if on _Bool, ++/-- on _Bool
+
+test_029.c
+  ternary operator
+
+test_030.c
+  << and >> operators, echo
+
+test_031.c
+  Casts between int and _Bool, implicit casts in assignment and _?_:_, echo
+
+test_032.c
+  Array assignment and reading, echo
+
+test_033.c
+  _Bool, casting _Bool to int, echo

@@ -1,0 +1,12 @@
+include "test_015.csp"
+
+loop1 :: Proc
+loop1 = echo_c.CIntKnown.0 -> loop1
+
+loop2 :: Proc
+loop2 = echo_c.CIntKnown.0 -> echo_c.CIntKnown.1 -> loop2
+
+testMain :: Proc
+testMain = loop1 |~| loop2
+
+assert testMain [FD= runMain

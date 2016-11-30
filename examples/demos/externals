@@ -1,0 +1,43 @@
+-- Default external functions
+--
+-- Specify functions like:
+--
+-- returnType name(argMode1,...,argModen);
+--
+-- Where argMode ::= in | out | inout
+--
+-- For input arguments (the usual case), output arguments (like a pointer where
+-- the function stores something), or arguments used both ways.
+
+
+@section FUNCTIONS {
+
+void send(in,in,in);
+
+void recv(in,in,out);
+
+void echo(in);
+
+void spawn(in);
+
+pid pthread_self();
+
+int pthread_equal(in,in);
+
+int pthread_create(out, in, in, in);
+
+int pthread_mutex_init(in, in);
+
+int pthread_mutex_lock(in);
+
+int pthread_mutex_unlock(in);
+
+}
+
+@section SETTINGS {
+
+minimumCVal = 0;
+
+maximumCVal = 4;
+
+}

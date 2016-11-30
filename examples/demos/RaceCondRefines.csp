@@ -1,0 +1,7 @@
+include "RaceCond.csp"
+
+raceCondSpec :: Proc
+raceCondSpec =  (echo_c.CIntKnown.1 -> echo_c.CIntKnown.2 -> STOP)
+
+assert raceCondSpec [T= hideMemSys(runMain)
+

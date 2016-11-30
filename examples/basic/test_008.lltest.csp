@@ -1,0 +1,13 @@
+include "test_008.csp"
+
+testMain :: (Int) -> Proc
+testMain (k) =
+  cIntRead_c.TID.0.CIntLoc_mypair.CIntKnown.k ->
+  cIntWrite_c.TID.0.CIntLoc_mypair.CIntKnown.((k+1)%2) ->
+  cIntRead_c.TID.0.CIntLoc_mypair_1.CIntKnown.k ->
+  cIntWrite_c.TID.0.CIntLoc_mypair_1.CIntKnown.((k+1)%2) ->
+  testMain ((k+1)%2)
+
+           
+
+assert testMain(0) [FD= runAsMain(main)

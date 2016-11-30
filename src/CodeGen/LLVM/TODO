@@ -1,0 +1,26 @@
+- The operandType/constantType functions need to be in the monad because they
+  require type info, and should probably be moved back to Analysis.  We should
+  just make that module's toplevel monadic.
+
+- We need to carefully consider our runtime model of each arithmetic function.
+  I'm sure it's wrong sometimes (for example, for small int sizes).  Just make
+  int width a parameter of the arithmetic functions?
+
+- Right now we're not keeping track of any function information so we can't
+  check that function applications are sensible.  Is this is a problem?
+
+- We need to fail (warn?) more gracefully in the presence of metadata
+
+- Fail more gracefully in analysis (put in monad?).  See repackageBlock, for
+  example.
+
+- Stack is inefficient.  Address space for individual types should only include
+  stack addresses if necessary, and the stack data union should only include the
+  types that are actually stored on the stack.
+
+- Constants are treated like any other globals, leading to lots and lots of
+  inefficient memory cells (for example, when there are strings in the program).
+  Build a better model for global constants (when a global declaration includes
+  the constant keyword, or maybe constant and unnamed_addr).  One idea: modify
+  the "read" functions so that they just return the right answer in these cases,
+  and the "write" functions so that they error.

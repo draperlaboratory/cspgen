@@ -1,0 +1,13 @@
+@section FUNCTIONS {
+
+void echo(int);
+
+}
+
+@section SETTINGS {
+
+minimumCVal = 0;
+
+maximumCVal = 5;
+
+}

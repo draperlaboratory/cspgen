@@ -1,0 +1,23 @@
+include "test_029.csp"
+
+testMain :: Proc
+testMain = BRANCH
+
+
+BRANCH :: Proc
+BRANCH = BRANCH1 |~| BRANCH2
+
+BRANCH1 :: Proc
+BRANCH1 = cIntWrite_c.PID.0.CIntLoc_k.CIntKnown.1 ->
+          cIntRead_c.PID.0.CIntLoc_k.CIntKnown.1 ->
+          cIntWrite_c.PID.0.CIntLoc_k.CIntKnown.1 -> TAIL
+
+BRANCH2 :: Proc
+BRANCH2 = cIntWrite_c.PID.0.CIntLoc_k.CIntKnown.2 ->
+          cIntRead_c.PID.0.CIntLoc_k.CIntKnown.2 ->
+          cIntWrite_c.PID.0.CIntLoc_k.CIntKnown.1 -> TAIL
+           
+TAIL :: Proc
+TAIL = cIntWrite_c.PID.0.CIntLoc_k.CIntKnown.1 -> STOP
+
+assert testMain [FD= runMain

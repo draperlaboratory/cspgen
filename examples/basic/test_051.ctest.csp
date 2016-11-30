@@ -1,0 +1,8 @@
+include "test_051.csp"
+
+testMain = echo_c.CIntKnown.1
+        -> echo_c.CIntKnown.2
+        -> STOP
+
+assert testMain [FD= hideMemSys(runMain)
+assert hideMemSys(runMain) [FD= testMain

@@ -1,0 +1,18 @@
+This file briefly describes the organization of the cspgen development.
+
+The outer directory contains the cabal file and some documentation.  The
+top-level directories are:
+
+src: Contains the haskell source.  Main.hs for the command-line tool is here.
+
+  - src/CodeGen/LLVM contains the llvm version.  See DriverLLVM.hs for the
+    external interface, or TransModel.hs for the top-level translation on the
+    LLVM AST.
+
+  - src/CodeGen/C contains the C version.  See DriverC.hs for the external
+    interface, or CodeGen.hs for the top-level translation on the C AST.
+    This pass is not organized very well and needs to be refactored.
+
+  - src/Tests has some testing infrastructure
+
+examples: has our test cases and a few higher-level "demo" examples.
