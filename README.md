@@ -33,7 +33,7 @@ supplying LLVM IR instead.
 
 ## Installation
 
-Cspgen is written in Haskell and can be build with cabal, the Haskell package
+Cspgen is written in Haskell and can be built with cabal, the Haskell package
 manager.  If you already have cabal installed, simply run `cabal install` from
 the top-level `specgen` directory.  The build depends on LLVM 3.4, which may be
 available from your operating systems package manager.  The `cspgen` binary will
