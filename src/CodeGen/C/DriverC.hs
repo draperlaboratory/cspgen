@@ -61,6 +61,7 @@ genCodeE di@(DriverInput {diFilename,diIntermediate,diExternals,
             FInfo {ftid = T.Fixed nm,
                    fret,
                    fargs = map (\_ -> UnknownType internal) modes,
+                   fvararg = False,
                    fdef = True}
     
       state = initState (minInt,maxInt) externalFInfos

@@ -820,8 +820,8 @@ transExp sa@(S.FunCall f args _)   =
   -- "externals" file) we don't have complete prototypes and therefore can't
   -- provide good errors in buildApp.
   expOuterLambdaState $ \st pid k -> do
-    FInfo {ftid,fret,fargs} <- transFunctionDescriptor f
-    when (length args /= length fargs) $ failExp sa $
+    FInfo {ftid,fret,fargs,fvararg} <- transFunctionDescriptor f
+    when (not fvararg && (length args /= length fargs)) $ failExp sa $
          "Function is applied to " ++ show (length args) ++ " arguments, but "
       ++ "its prototype has " ++ show (length fargs) ++ " arguments"
     let typedArgs = zip fargs args

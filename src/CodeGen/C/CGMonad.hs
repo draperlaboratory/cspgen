@@ -398,6 +398,8 @@ type TDefMap = M.Map S.Id BaseType
 -- 
 -- - The types of its arguments, which allow us to typecheck uses of this
 --   function or to produce a stub for it in the event it is never defined.
+--
+-- - A flag indicating if the function is variadic.
 -- 
 -- - Whether this function has been defined.
 --
@@ -407,6 +409,7 @@ type TDefMap = M.Map S.Id BaseType
 data FInfo = FInfo {ftid  :: T.Id,
                     fret  :: BaseType,
                     fargs :: [BaseType],
+                    fvararg :: Bool,
                     fdef  :: Bool
                    }
 
@@ -1280,13 +1283,13 @@ freshArrayGlobals nmHint gdeclpos bt len = do
     (tid:_) -> return $ T.EId tid
     []      -> failPos gdeclpos "Unsupported: 0-length array"
 
--- This generates a fresh name for a function, the types of its arguments, and
--- the function's return type.
-freshFunction :: S.Id -> [BaseType] -> BaseType -> CG FInfo
-freshFunction sid fargs fret = do
+-- This generates a fresh name for a function, the types of its arguments,
+-- whether the function is variadic, and the function's return type.
+freshFunction :: S.Id -> [BaseType] -> Bool -> BaseType -> CG FInfo
+freshFunction sid fargs fvararg fret = do
   let nm = S.stringPart sid
   tid <- freshTid (Just nm)
-  let finfo = FInfo {ftid=tid,fargs,fret,fdef=False}
+  let finfo = FInfo {ftid=tid,fargs,fvararg,fret,fdef=False}
   extendFunction sid finfo
   return finfo
 

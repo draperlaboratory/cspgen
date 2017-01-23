@@ -45,7 +45,8 @@ import qualified Data.Map as M
 -- create a CSP name for it, don't produce a Proc yet (since this is only the
 -- declaration, not the body).
 addFunctionDeclaration :: S.FDecln -> CG FInfo
-addFunctionDeclaration (S.FDecln {S.funName,S.funArgs,S.funReturnTy}) = do
+addFunctionDeclaration (S.FDecln {S.funName,S.funArgs,
+                                  S.funVariadic,S.funReturnTy}) = do
   mf <- lookupFunction funName
   case mf of
     Just finfo -> return finfo
@@ -56,7 +57,7 @@ addFunctionDeclaration (S.FDecln {S.funName,S.funArgs,S.funReturnTy}) = do
       -- a target name for it and add it to the monad.
       fret <- transType funReturnTy
       fargs <- mapM (transType . snd) funArgs
-      freshFunction funName fargs fret
+      freshFunction funName fargs funVariadic fret
 
 -- External function declarations are translated into Procs (their
 -- bodies are the things that become CFGs).  Everything else is just
