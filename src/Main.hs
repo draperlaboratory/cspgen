@@ -142,4 +142,4 @@ main = do
     addFile :: String -> IO ()
     addFile fin = do
       contents <- readFile fin
-      appendFile tmpFile $ "#line 1 \"" ++ fin ++ "\"\n" ++ contents
+      appendFile tmpFile $ "\n#line 1 \"" ++ fin ++ "\"\n" ++ contents
