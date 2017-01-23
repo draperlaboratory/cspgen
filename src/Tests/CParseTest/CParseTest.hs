@@ -12,8 +12,7 @@ testPath :: FilePath
 testPath = "examples/basic/"
 
 testFiles :: [String]
-testFiles = "SysModel"
-          : (map (\i -> "test_00" ++ show i) ([1..9] :: [Int]))
+testFiles = (map (\i -> "test_00" ++ show i) ([1..9] :: [Int]))
          ++ (map (\i -> "test_0" ++ show i) ([10..54] :: [Int]))
 
 process :: FilePath -> IO Bool
