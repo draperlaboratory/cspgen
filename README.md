@@ -9,6 +9,9 @@ high-level communication behavior of the input code and to abstract data as much
 as possible to reduce model-checking time.  It supports a subset of the pthreads
 library for multithreading and mutex primitives.
 
+This repository also includes a formally verified Coq implementation of cspgen's
+core algorithm.
+
 This is prototype, research software.
 
 
@@ -46,6 +49,8 @@ The `examples` directory contains a variety of C and C++ files we use as test
 cases and examples.  The tests can be run with `cabal test` or with `cspgen -t`,
 which provides more information.  Note that some of the LLVM tests are currently
 known to fail.
+
+The `verif` directory contains a coq verification of the core algorithm.
 
 For information about the organization of the source code, see the ORGANIZATION
 file in this directory.

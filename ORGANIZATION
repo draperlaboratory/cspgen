@@ -16,3 +16,5 @@ src: Contains the haskell source.  Main.hs for the command-line tool is here.
   - src/Tests has some testing infrastructure
 
 examples: has our test cases and a few higher-level "demo" examples.
+
+verif: has the coq proofs
